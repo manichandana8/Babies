@@ -1,0 +1,206 @@
+---
+title: "Final650"
+author: "Surekha Peethambaram Muralidhar"
+format:
+  html:
+     self-contained: true
+editor: visual
+---
+
+## RESEARCH QUESTION: Is there a significant difference in birth weight between babies born to mothers who smoke and those who do not, while also considering the effect of the mother's age?
+
+```{r}
+library(ggplot2) 
+library(openintro)
+library(gt)
+library(kableExtra)
+library(dplyr)
+library(pROC)
+library(caret)
+```
+
+```{r}
+data(babies)
+head(babies)
+```
+
+-\>The str(babies) function displays the structure of the dataset, showing data types and the first few entries of each column.
+
+-\>Then we remove rows with missing values in key columns (weight, age, smoke, and gestation) to ensure that our analysis is based on complete cases only.
+
+-\>The smoke variable is converted to a factor to facilitate regression modeling and to improve the interpretations. The levels are set to "Nonsmoker" and "Smoker".
+
+```{r}
+
+# Remove rows with missing values in relevant columns
+ncbirths_clean <- na.omit(babies[, c("bwt", "age", "smoke", "gestation", "parity", "height","weight")])
+
+
+# Convert 'smoke' to a factor with specified levels
+ncbirths_clean$smoke <- factor(ncbirths_clean$smoke, 
+                                levels = c(0, 1), 
+                                labels = c("Nonsmoker", "Smoker"))
+
+```
+
+## SUMMARY STATISTICS
+
+```{r}
+# Generate summary statistics 
+summary_stats <- ncbirths_clean %>%
+  summarise(
+    Mean_Weight = mean(weight),
+    SD_Weight = sd(weight),
+     Mean_bWeight = mean(bwt),
+     SD_bWeight = sd(bwt),
+    Mean_Age = mean(age),
+    SD_Age = sd(age),
+    Mean_Gestation = mean(gestation),
+    SD_Gestation = sd(gestation),
+    Mean_Parity = mean(parity),
+    SD_Parity = sd(parity),
+    Mean_Height = mean(height),
+    SD_Height = sd(height)
+  )
+
+# Convert summary statistics to a data frame
+summary_df <- as.data.frame(t(summary_stats))
+
+# Use kable to display the summary statistics
+summary_df %>%
+  kable(col.names = c("Summary Statistic", "Value")) %>%
+  kable_styling(full_width = F)
+
+```
+
+# PLOTS AND VISUALIZATION
+
+## BOXPLOTS
+
+```{r}
+# Boxplot for Mother's Age by Smoking Status
+ggplot(ncbirths_clean, aes(x = age, y = bwt, fill = smoke)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Birth-weight by Mother's Age and Smoking Status",
+       x = "Mother's Age", y = "Birth-weight") +
+  theme_minimal()
+
+
+```
+
+## DENSITY PLOTS
+
+```{r}
+# Density plot for Age
+ggplot(ncbirths_clean, aes(x = age, fill = smoke)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Density Plot of Mother's Age by Smoking Status",
+       x = "Mother's Age", y = "Density") +
+  theme_minimal()
+
+# Density plot for Weight
+ggplot(ncbirths_clean, aes(x = bwt, fill = smoke)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Density Plot of Birth Weight by Smoking Status",
+       x = "Birth Weight", y = "Density") +
+  theme_minimal()
+
+```
+
+## LOGISTICS REGRESSION MODEL
+
+```{r}
+# Fit a logistic regression model to predict smoking status (smoke) using other variables
+logistic_model <- glm(smoke ~ age + bwt + gestation, data = ncbirths_clean, family = binomial)
+
+# Predict probabilities of smoking (Smoker)
+predicted_probabilities <- predict(logistic_model, type = "response")
+
+# Plot the ROC curve
+roc_curve <- roc(ncbirths_clean$smoke, predicted_probabilities)
+
+
+# Add AUC to the ROC plot
+auc_value <- auc(roc_curve)
+ggroc(roc_curve) + 
+  ggtitle(paste("ROC Curve with AUC =", round(auc_value, 2))) + 
+  xlab("1 - Specificity (False Positive Rate)") + 
+  ylab("Sensitivity (True Positive Rate)") +
+  theme_minimal()
+print(paste("AUC:", auc_value))
+
+```
+
+
+## SCATTERPLOT BASED ON RELATIONSHIP BETWEEN THE MOTHER'S AGE AND BIRTH-WEIGHT WITH RESPECT TO SMOKING STATUS
+
+-\> The scatter plot visualizes the relationship between the mother's age and birth weight, with points colored by the smoking status of the mother. This helps to identify trends and potential differences in birth weight.
+
+-\> The legend() function adds a legend to the plot for clarity.
+
+-\> The histogram shows the distribution of birth weights, allowing us to assess the overall data spread and check for normality visually.
+
+```{r}
+
+# Scatter plot of birth weight vs. mother's age, colored by smoking status
+plot(ncbirths_clean$age, ncbirths_clean$bwt, 
+     col = ncbirths_clean$smoke, 
+     pch = 19, 
+     xlab = "Mother's Age", 
+     ylab = "Birth Weight (grams)", 
+     main = "Birth Weight vs. Mother's Age by Smoking Status")
+
+legend("topright", legend = levels(ncbirths_clean$smoke), col = 1:2, pch = 19)
+
+# Create a histogram of birth weights
+hist(ncbirths_clean$bwt, 
+     breaks = 30,  # Number of bins
+     main = "Histogram of Birth Weights", 
+     xlab = "Birth Weight (grams)", 
+     ylab = "Frequency", 
+     col = "lightblue", 
+     border = "black")
+
+```
+
+## MULTIPLEREGRESSION MODEL TO PREDICT THE DEPENDENCY OF BOTHE PREDICTORS AND RESPONSE VARIABLE
+
+-\> Fit a multiple linear regression model with birth weight as the dependent variable and mother's age and smoking status as independent variables.
+
+-\> This allows us to assess the impact of both predictors on birth weight simultaneously.
+
+-\> The summary(model) function provides detailed output, including coefficients, significance levels, R-squared value, and other statistics that indicate how well the model fits the data.
+
+```{r}
+
+# Birth weight as the outcome variable, with mother's age and smoking status as predictors
+model <- lm(bwt ~ age + smoke, data = ncbirths_clean)
+
+# summary of the regression model
+summary(model)
+
+```
+
+## CONFIDENCE INTERVAL
+
+-\> Confidence intervals provide a range for the estimated coefficients, indicating their reliability and significance.
+
+```{r}
+# Confidence intervals for the coefficients
+confint(model)
+```
+
+## PREDICTION
+
+-\> Predictions allow you to estimate birth weight based on specific values of mother's age and smoking status, providing insights into how these factors impact birth weight.
+
+```{r}
+# Create a new data frame for predictions
+new_data <- data.frame(age = 30, smoke = factor(c("Nonsmoker", "Smoker"), levels = c("Nonsmoker", "Smoker")))
+
+# Predict birth weight for both groups
+predicted_weights <- predict(model, new_data)
+
+predicted_weights
+
+```
